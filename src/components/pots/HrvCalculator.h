@@ -16,7 +16,7 @@ namespace Pinetime {
       bool HasValidReading() const;
 
     private:
-      static constexpr uint8_t bufSize = 20;
+      static constexpr uint8_t bufSize = 6;
       uint16_t ibiBuf[bufSize] = {};
       uint8_t bufHead = 0;
       uint8_t bufCount = 0;

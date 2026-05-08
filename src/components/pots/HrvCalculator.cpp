@@ -53,9 +53,11 @@ void HrvCalculator::Recalculate() {
   rmssd = IntSqrt(rmssdSq);
   valid = true;
 
-  if (rmssd < 20) {
+  // Thresholds calibrated for HR-derived IBI proxy (not true R-R intervals).
+  // 1 bpm change at 70 bpm → ~12ms IBI delta → proxy RMSSD of ~8ms.
+  if (rmssd < 5) {
     zone = HrvZone::Low;
-  } else if (rmssd <= 40) {
+  } else if (rmssd <= 15) {
     zone = HrvZone::Moderate;
   } else {
     zone = HrvZone::Good;

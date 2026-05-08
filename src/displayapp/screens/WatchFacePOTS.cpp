@@ -148,8 +148,8 @@ void WatchFacePOTS::Refresh() {
 
   if (hr > 30 && hr < 220) {
     lastHr = hr;
-    // Feed an IBI estimate every ~15 seconds (HR changes slowly)
-    if (secondCounter - lastHrIbiSec >= 15) {
+    // Feed an IBI estimate every 3 seconds
+    if (secondCounter - lastHrIbiSec >= 3) {
       // IBI (ms) ≈ 60000 / HR
       // Use integer division; avoid division by zero
       uint16_t ibi = static_cast<uint16_t>(60000u / static_cast<uint32_t>(hr));
