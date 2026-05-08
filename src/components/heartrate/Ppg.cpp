@@ -172,6 +172,19 @@ int Ppg::HeartRate() {
   return hr;
 }
 
+uint16_t Ppg::GetLastIbi() const {
+  // Derive IBI estimate from the last non-zero HR average entry.
+  for (int i = static_cast<int>(dataAverage.size()) - 1; i >= 0; i--) {
+    if (dataAverage[i] > 0.0f) {
+      uint32_t bpm = static_cast<uint32_t>(dataAverage[i] * 60.0f + 0.5f);
+      if (bpm >= 30 && bpm <= 220) {
+        return static_cast<uint16_t>(60000u / bpm);
+      }
+    }
+  }
+  return 0;
+}
+
 void Ppg::Reset(bool resetDaqBuffer) {
   if (resetDaqBuffer) {
     dataIndex = 0;

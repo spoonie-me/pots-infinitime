@@ -16,6 +16,8 @@ namespace Pinetime {
       Ppg();
       int8_t Preprocess(uint16_t hrs, uint16_t als);
       int HeartRate();
+      // Returns estimated IBI (ms) from last valid HR. 0 if no valid HR yet.
+      uint16_t GetLastIbi() const;
       void Reset(bool resetDaqBuffer);
       static constexpr int deltaTms = 100;
       // Daq dataLength: Must be power of 2

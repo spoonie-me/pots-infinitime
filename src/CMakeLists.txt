@@ -430,6 +430,12 @@ list(APPEND SOURCE_FILES
         displayapp/screens/WatchFacePineTimeStyle.cpp
         displayapp/screens/WatchFaceCasioStyleG7710.cpp
         displayapp/screens/WatchFacePrideFlag.cpp
+        displayapp/screens/WatchFacePOTS.cpp
+
+        ## POTS Companion components
+        components/pots/OrthoPOTSDetector.cpp
+        components/pots/HrvCalculator.cpp
+        components/pots/ActivityClassifier.cpp
 
         ##
 
