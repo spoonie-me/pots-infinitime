@@ -1,111 +1,166 @@
-<div align="center">
+# POTS Companion — InfiniTime Firmware Fork
 
-![Header Image](doc/logo/watchface_collage.png)
+A custom [InfiniTime](https://github.com/InfiniTimeOrg/InfiniTime) firmware fork adding the **POTS Companion watchface** for the [PineTime](https://www.pine64.org/pinetime/) open smartwatch.
 
-<br>
+Built for people with **Postural Orthostatic Tachycardia Syndrome (POTS)** and dysautonomia — conditions where the autonomic nervous system's response to gravity is impaired, making every standing transition a measurable physiological event.
 
-[![GitHub tag](https://img.shields.io/github/tag/InfiniTimeOrg/InfiniTime?include_prereleases=&sort=semver&color=blue)](https://github.com/InfiniTimeOrg/InfiniTime/releases)
-[![GitHub License](https://img.shields.io/github/license/InfiniTimeOrg/InfiniTime)](https://github.com/InfiniTimeOrg/InfiniLink/blob/main/LICENSE)
-[![Issues - InfiniTime](https://img.shields.io/github/issues/InfiniTimeOrg/InfiniTime)](https://github.com/InfiniTimeOrg/InfiniTime/issues)
-[![Pull Requests - InfiniTime](https://img.shields.io/github/issues-pr/InfiniTimeOrg/InfiniTime)](https://github.com/InfiniTimeOrg/InfiniTime/pulls)
-[![Downloads - InfiniTime](https://img.shields.io/github/downloads/InfiniTimeOrg/InfiniTime/total)](https://github.com/InfiniTimeOrg/InfiniTime)
-[![Stars - InfiniTime](https://img.shields.io/github/stars/InfiniTimeOrg/InfiniTime?style=social)](https://github.com/InfiniTimeOrg/InfiniTime/stargazers)
-[![Forks - InfiniTime](https://img.shields.io/github/forks/InfiniTimeOrg/InfiniTime?style=social)](https://github.com/InfiniTimeOrg/InfiniTime/network/members)
+This is not a fitness tracker. It is a **constraint-aware body monitoring tool**.
 
-# InfiniTime
+---
 
-*Fast open-source firmware for the [PineTime smartwatch](https://pine64.org/devices/pinetime/) with many features, written in modern C++.*
+## What it monitors
 
-<br>
+| Signal | Why it matters for POTS |
+|--------|------------------------|
+| Resting HR | Baseline sympathetic tone — shifts before symptoms do |
+| Orthostatic HR delta | The diagnostic number: ≥30 bpm rise on standing = POTS threshold |
+| HRV proxy (RMSSD) | Autonomic state: Low = flare risk, Good = recovery window |
+| Upright minutes | Cumulative orthostatic load for the day |
+| Active minutes | Capacity spent — not a goal, a budget |
+| Sedentary minutes | Recovery time banked — alerts at 45 min stretch |
 
-</div>
+The orthostatic delta is the number that tells a POTS patient whether today is a flare day **before** they've committed to standing up and paying for it with hours of recovery.
 
-## New to InfiniTime?
+---
 
-- [Getting started with InfiniTime](doc/gettingStarted/gettingStarted-1.0.md)
-- [Updating the software](doc/gettingStarted/updating-software.md)
-- [About the firmware and bootloader](doc/gettingStarted/about-software.md)
-- [Available apps](doc/gettingStarted/Applications.md)
-- [Available watch faces](/doc/gettingStarted/Watchfaces.md)
-- [PineTimeStyle Watch face](https://pine64.org/documentation/PineTime/Watchfaces/PineTimeStyle)
-  - [Weather integration](https://pine64.org/documentation/PineTime/Software/InfiniTime_weather/)
+## Watchface layout
 
-### Companion apps
+```
+┌─────────────────────────────┐
+│  08:42          07 May      │  ← time + date
+│                             │
+│   ♥  89 bpm    +22 Δ       │  ← HR (amber during ortho window)
+│                             │
+│  HRV: MOD        UPRIGHT   │  ← HRV zone + posture
+│                             │
+│  ┌────┐  ┌────┐  ┌────┐   │
+│  │████│  │████│  │    │   │  ← active / sedentary / upright rings
+│  └────┘  └────┘  └────┘   │
+│                             │
+│       steps: 2,341          │
+└─────────────────────────────┘
+```
 
+**Colour coding:**
+- HR text: white → amber (ortho window open) → red (delta ≥ 30 bpm flagged)
+- HRV: teal (Good) / amber (Moderate) / red (Low)
+- Ring 1 teal: active minutes, goal 30/day
+- Ring 2 coral: sedentary inverse — full when resting, drains as you sit, turns red at 45-min streak
+- Ring 3 purple: upright minutes, goal 60/day for POTS management
+
+---
+
+## Orthostatic detection
+
+The firmware watches for **standing transitions**:
+
+1. Detects supine posture via BMA42x Z-axis (|Z| > 0.85g)
+2. Requires ≥60 seconds of lying down before arming
+3. On standing (|Z| < 0.3g, |Y| > 0.7g): opens a 3-minute observation window
+4. Tracks peak HR during window, computes delta vs. reclined baseline
+5. Flags event if delta ≥ 30 bpm (established POTS diagnostic criterion)
+6. Stores last 5 events in a static ring buffer — no heap allocation
+
+All computation runs on-watch. No companion app required for core function.
+
+---
+
+## Architecture
+
+```
+BMA42x accelerometer → MotionController → OrthoPOTSDetector
+HRS3300 PPG sensor   → HeartRateController → OrthoPOTSDetector
+                                           → HrvCalculator
+OrthoPOTSDetector + HrvCalculator + ActivityClassifier → WatchFacePOTS (LVGL)
+```
+
+**New components:**
+- `src/components/pots/OrthoPOTSDetector` — posture state machine + orthostatic event detection
+- `src/components/pots/HrvCalculator` — RMSSD proxy from IBI estimates, zone classification
+- `src/components/pots/ActivityClassifier` — BMA42x magnitude classifier, daily minute counters
+- `src/displayapp/screens/WatchFacePOTS` — 240×240 LVGL watchface, 1Hz refresh, zero heap in render loop
+
+---
+
+## Hardware constraints
+
+Runs on PineTime: ARM Cortex-M4 @ 64MHz, 64KB RAM, 512KB flash.
+
+Design choices:
+- No heap allocation in the render loop — all LVGL objects created once in constructor
+- No floating point in hot paths — integer fixed-point math throughout
+- No new HR session started — reads from the existing `HeartRateController`
+- HRV labeled "proxy" throughout — HRS3300 + FFT pipeline is approximate
+
+---
+
+## Build
+
+### Dependencies
+- `arm-none-eabi-gcc` and `cmake >= 3.16`
+- [nRF5 SDK 15.3.0](https://www.nordicsemi.com/Software-and-tools/Software/nRF5-SDK)
+- [InfiniTime build guide](https://github.com/InfiniTimeOrg/InfiniTime/blob/develop/doc/buildAndProgram.md)
+
+```bash
+git clone https://github.com/spoonie-me/pots-infinitime.git
+cd pots-infinitime
+mkdir build && cd build
+
+cmake \
+  -DARM_NONE_EABI_TOOLCHAIN_PATH=/usr \
+  -DNRF5_SDK_PATH=/path/to/nrf5_sdk \
+  -DCMAKE_BUILD_TYPE=Release \
+  ..
+
+make -j$(nproc) pinetime-app
+# Output: build/src/pinetime-app-*.zip  (OTA-flashable via Gadgetbridge / Amazfish)
+```
+
+### Simulator (no hardware required)
+
+```bash
+# Requires: libsdl2-dev
+cmake -DUSE_SDL2_SIMULATOR=ON ..
+make pinetime-sim
+./pinetime-sim
+```
+
+---
+
+## Flash
+
+Flash the `.zip` OTA package via:
 - [Gadgetbridge](https://gadgetbridge.org/) (Android)
-- [Amazfish](https://github.com/piggz/harbour-amazfish/) ([SailfishOS](https://sailfishos-chum.github.io/apps/harbour-amazfish/), [Ubuntu Touch](https://open-store.io/app/uk.co.piggz.amazfish), [Flatpak](https://flathub.org/apps/uk.co.piggz.amazfish))
-- [Siglo](https://github.com/alexr4535/siglo) (Linux)
+- [Amazfish](https://github.com/piggz/harbour-amazfish) (SailfishOS / Linux)
 - [InfiniLink](https://github.com/InfiniTimeOrg/InfiniLink) (iOS)
-- [ITD](https://gitea.elara.ws/Elara6331/itd) (Linux)
-- [WatchMate](https://github.com/azymohliad/watchmate) (Linux)
-- [InfiniTimeExplorer](https://infinitimeexplorer.netlify.app) (Web)
+- OpenOCD (development hardware)
 
-<br>
+---
 
-> *InfiniTimeExplorer is only compatible with web browsers that support Web BLE. Current fully supported browsers include Chrome and Microsoft Edge.* 
->
-> *We removed mentions to NRFConnect as this app is closed source and recent versions do not work anymore with InfiniTime (the last version known to work is 4.24.3). If you used NRFConnect in the past, we recommend you switch to [Gadgetbridge](https://gadgetbridge.org/).* 
+## Phased roadmap
 
-## Development
+- [x] **Phase 1** — Core watchface: live HR, steps, activity rings, simulator-ready
+- [x] **Phase 2** — Orthostatic detection: posture state machine, delta display, 3-min window
+- [x] **Phase 3** — HRV proxy: RMSSD from IBI estimates, zone classification
+- [x] **Phase 4** — Polish: sedentary alert, daily reset, edge cases (no HR, cold start)
+- [ ] **Phase 5** — True IBI: peak detection in PPG pipeline for clinical-grade RMSSD
+- [ ] **Phase 6** — Gadgetbridge logging: BLE export of orthostatic events for trend review
+- [ ] **Phase 7** — Flare prediction: rolling baseline shift detection
 
-- [InfiniTime Vision](doc/InfiniTimeVision.md)
-- [Rough structure of the code](doc/code/Intro.md)
-- [How to implement an application](doc/code/Apps.md)
-- [Generate the fonts and symbols](src/displayapp/fonts/README.md)
-- [Tips on designing an app UI](doc/ui_guidelines.md)
-- [Bootloader, OTA and DFU](bootloader/README.md)
-- [External resources](doc/ExternalResources.md)
+---
 
-### Contributing
+## Contributing
 
-- [How to contribute](CONTRIBUTING.md)
-- [Coding conventions](doc/coding-convention.md)
+PRs welcome, especially from people with POTS who use this day-to-day. Please open an issue before large changes.
 
-### Build, flash and debug
+If you have dysautonomia and want to help shape the feature roadmap, open a Discussion — lived experience drives better design than any spec.
 
-- [InfiniTime simulator](https://github.com/InfiniTimeOrg/InfiniSim)
-- [Build the project](doc/buildAndProgram.md)
-- [Build the project with Docker](doc/buildWithDocker.md)
-- [Build the project with VSCode](doc/buildWithVScode.md)
-- [Flash the firmware using OpenOCD and STLinkV2](doc/openOCD.md)
-- [Flash the firmware using SWD interface](doc/SWD.md)
-- [Flash the firmware using JLink](doc/jlink.md)
-- [Flash the firmware using GDB](doc/gdb.md)
-- [Stub using NRF52-DK](doc/PinetimeStubWithNrf52DK.md)
+---
 
-### API
+## Upstream
 
-- [BLE implementation and API](doc/ble.md)
+This is a fork of [InfiniTime](https://github.com/InfiniTimeOrg/InfiniTime) by the InfiniTime contributors, licensed GPL-3.0. All upstream changes are tracked on the `main` branch; POTS-specific work lives on `feature/pots-companion-watchface`.
 
-### Architecture and technical topics
+## License
 
-- [Memory analysis](doc/MemoryAnalysis.md)
-
-### Project management
-
-- [Maintainer's guide](doc/maintainer-guide.md)
-- [Versioning](doc/versioning.md)
-- [Project branches](doc/branches.md)
-- [Files included in the release notes](doc/filesInReleaseNotes.md)
-- [Files needed by the factory](doc/files-needed-by-factory.md)
-
-## Licenses
-
-This project is released under the GNU General Public License version 3 or, at your option, any later version.
-
-It integrates the following projects:
-
-- RTOS: **[FreeRTOS](https://freertos.org)** under the MIT license
-- UI: **[LittleVGL/LVGL](https://lvgl.io/)** under the MIT license
-- BLE stack: **[NimBLE](https://github.com/apache/mynewt-nimble)** under the Apache 2.0 license
-- Font: **[Jetbrains Mono](https://www.jetbrains.com/fr-fr/lp/mono/)** under the Apache 2.0 license
-
-## Credits
-
-I’m not working alone on this project. First, many people create pull requests for this project. Then, there is the whole #pinetime community: a lot of people all around the world who are hacking, searching, experimenting and programming the Pinetime. We exchange our ideas, experiments and code in the chat rooms and forums.
-
-Here are some people I would like to highlight:
-
-- [Atc1441](https://github.com/atc1441/): He works on an Arduino based firmware for the Pinetime and many other smartwatches based on similar hardware. He was of great help when I was implementing support for the BMA421 motion sensor and I²C driver.
-- [Koen](https://github.com/bosmoment): He’s working on a firmware based on RiotOS. He integrated similar libs as me: NimBLE, LittleVGL,… His help was invaluable too!
-- [Lup Yuen Lee](https://github.com/lupyuen): He is everywhere: he works on a Rust firmware, builds a MCUBoot based bootloader for the Pinetime, designs a Flutter based companion app for smartphones and writes a lot of articles about the Pinetime!
+GPL-3.0-or-later — same as InfiniTime upstream. See [LICENSE](LICENSE).
