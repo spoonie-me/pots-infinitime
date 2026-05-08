@@ -11,6 +11,7 @@
 #include "components/pots/ActivityClassifier.h"
 #include "utility/DirtyValue.h"
 #include "displayapp/apps/Apps.h"
+#include "displayapp/Controllers.h"
 
 namespace Pinetime {
   namespace Controllers {
