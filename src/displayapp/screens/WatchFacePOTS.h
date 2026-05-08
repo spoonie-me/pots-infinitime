@@ -12,6 +12,7 @@
 #include "utility/DirtyValue.h"
 #include "displayapp/apps/Apps.h"
 #include "displayapp/Controllers.h"
+#include "components/ble/POTSDataService.h"
 
 namespace Pinetime {
   namespace Controllers {
@@ -25,7 +26,8 @@ namespace Pinetime {
       public:
         WatchFacePOTS(Controllers::DateTime& dateTimeController,
                       Controllers::HeartRateController& heartRateController,
-                      Controllers::MotionController& motionController);
+                      Controllers::MotionController& motionController,
+                      Controllers::POTSDataService* potsDataService);
         ~WatchFacePOTS() override;
 
         void Refresh() override;
@@ -34,6 +36,7 @@ namespace Pinetime {
         Controllers::DateTime& dateTimeController;
         Controllers::HeartRateController& heartRateController;
         Controllers::MotionController& motionController;
+        Controllers::POTSDataService* potsDataService;
 
         Components::OrthoPOTSDetector orthoDetector;
         Components::HrvCalculator hrvCalc;
@@ -44,6 +47,7 @@ namespace Pinetime {
         uint32_t secondCounter = 0;     // seconds since watchface created
         uint16_t lastDayStamp = 0;      // date stamp for daily reset detection
         uint32_t lastHrIbiSec = 0;      // when we last added an IBI sample
+        uint8_t lastOrthoEventCount = 0; // detect new ortho events for BLE notify
 
         // LVGL objects — all allocated once in constructor
         lv_obj_t* label_time;
@@ -93,7 +97,8 @@ namespace Pinetime {
       static Screens::Screen* Create(AppControllers& controllers) {
         return new Screens::WatchFacePOTS(controllers.dateTimeController,
                                           controllers.heartRateController,
-                                          controllers.motionController);
+                                          controllers.motionController,
+                                          controllers.potsDataService);
       }
 
       static bool IsAvailable(Pinetime::Controllers::FS& /*filesystem*/) {

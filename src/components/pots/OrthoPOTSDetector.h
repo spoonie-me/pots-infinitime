@@ -32,6 +32,9 @@ namespace Pinetime {
 
       bool IsInOrthoWindow() const;
 
+      // Total events recorded ever (monotonically increasing, wraps at 255)
+      uint8_t GetTotalEventCount() const { return totalEventCount; }
+
     private:
       static constexpr uint32_t supineDwellMin = 60;     // seconds before transition counts
       static constexpr uint32_t orthoWindowDuration = 180; // 3-minute observation
@@ -59,6 +62,7 @@ namespace Pinetime {
       OrthoEvent history[maxHistory] = {};
       uint8_t historyHead = 0;
       uint8_t historyCount = 0;
+      uint8_t totalEventCount = 0;
 
       static int32_t Abs(int32_t v) { return v < 0 ? -v : v; }
 

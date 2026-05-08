@@ -42,6 +42,7 @@ void OrthoPOTSDetector::FinalizeOrthoEvent(uint32_t timestamp_s) {
   history[historyHead] = evt;
   historyHead = (historyHead + 1) % maxHistory;
   if (historyCount < maxHistory) historyCount++;
+  totalEventCount++;
 }
 
 void OrthoPOTSDetector::Update(int16_t z, int16_t y, uint8_t current_hr, uint32_t timestamp_s) {

@@ -6,6 +6,7 @@
 #include "displayapp/screens/Alarm.h"
 #include "components/battery/BatteryController.h"
 #include "components/ble/BleController.h"
+#include "components/ble/POTSDataService.h"
 #include "components/datetime/DateTimeController.h"
 #include "components/ble/NotificationManager.h"
 #include "components/motion/MotionController.h"
@@ -128,6 +129,7 @@ DisplayApp::DisplayApp(Drivers::St7789& lcd,
                  nullptr,
                  this,
                  lvgl,
+                 nullptr,
                  nullptr,
                  nullptr} {
 }
@@ -730,6 +732,10 @@ void DisplayApp::Register(Pinetime::Controllers::MusicService* musicService) {
 
 void DisplayApp::Register(Pinetime::Controllers::NavigationService* NavigationService) {
   this->controllers.navigationService = NavigationService;
+}
+
+void DisplayApp::Register(Pinetime::Controllers::POTSDataService* potsDataService) {
+  this->controllers.potsDataService = potsDataService;
 }
 
 void DisplayApp::ApplyBrightness() {

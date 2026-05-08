@@ -6,6 +6,7 @@
 #include "components/datetime/DateTimeController.h"
 #include "components/heartrate/HeartRateController.h"
 #include "components/motion/MotionController.h"
+#include "components/ble/POTSDataService.h"
 
 using namespace Pinetime::Applications::Screens;
 
@@ -38,10 +39,12 @@ static void SetRingValue(lv_obj_t* arc, uint8_t pct) {
 // ------------------------------------------------------------
 WatchFacePOTS::WatchFacePOTS(Controllers::DateTime& dateTimeController,
                               Controllers::HeartRateController& heartRateController,
-                              Controllers::MotionController& motionController)
+                              Controllers::MotionController& motionController,
+                              Controllers::POTSDataService* potsDataService)
   : dateTimeController {dateTimeController},
     heartRateController {heartRateController},
-    motionController {motionController} {
+    motionController {motionController},
+    potsDataService {potsDataService} {
 
   heartRateController.Enable();
 
@@ -182,6 +185,34 @@ void WatchFacePOTS::Refresh() {
   // --- Steps ---
   uint32_t steps = motionController.NbSteps();
   lv_label_set_text_fmt(label_steps, "steps: %u", static_cast<unsigned int>(steps));
+
+  // --- BLE notifications ---
+  if (potsDataService != nullptr) {
+    // HRV: notify every time a new valid reading is available
+    if (hrvCalc.HasValidReading()) {
+      uint8_t rmssd = hrvCalc.GetRmssd();
+      uint8_t zone = static_cast<uint8_t>(hrvCalc.GetZone());
+      potsDataService->NotifyHrv(rmssd, zone);
+    }
+
+    // Ortho event: notify once per new finalized event
+    uint8_t currentOrthoCount = orthoDetector.GetTotalEventCount();
+    if (currentOrthoCount != lastOrthoEventCount) {
+      lastOrthoEventCount = currentOrthoCount;
+      const auto* evt = orthoDetector.GetLastEvent();
+      if (evt != nullptr) {
+        potsDataService->NotifyOrthoEvent(evt->timestamp, evt->hr_baseline, evt->hr_peak, evt->delta, evt->flagged);
+      }
+    }
+
+    // Daily stats: update every second
+    {
+      uint16_t activeMins    = activityClassifier.GetActiveMinutesDay();
+      uint16_t sedentaryMins = activityClassifier.GetSedentaryMinutesDay();
+      uint16_t uprightMins   = activityClassifier.GetUprightMinutesDay();
+      potsDataService->UpdateDailyStats(activeMins, sedentaryMins, uprightMins);
+    }
+  }
 }
 
 // ------------------------------------------------------------
