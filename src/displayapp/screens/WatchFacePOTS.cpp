@@ -43,6 +43,8 @@ WatchFacePOTS::WatchFacePOTS(Controllers::DateTime& dateTimeController,
     heartRateController {heartRateController},
     motionController {motionController} {
 
+  heartRateController.Enable();
+
   // Dark background
   lv_obj_set_style_local_bg_color(lv_scr_act(), LV_OBJ_PART_MAIN, LV_STATE_DEFAULT, lv_color_hex(COL_BG));
 
@@ -110,6 +112,7 @@ WatchFacePOTS::WatchFacePOTS(Controllers::DateTime& dateTimeController,
 }
 
 WatchFacePOTS::~WatchFacePOTS() {
+  heartRateController.Disable();
   lv_task_del(taskRefresh);
   lv_obj_clean(lv_scr_act());
 }
@@ -178,7 +181,7 @@ void WatchFacePOTS::Refresh() {
 
   // --- Steps ---
   uint32_t steps = motionController.NbSteps();
-  lv_label_set_text_fmt(label_steps, "steps: %lu", steps);
+  lv_label_set_text_fmt(label_steps, "steps: %u", static_cast<unsigned int>(steps));
 }
 
 // ------------------------------------------------------------
