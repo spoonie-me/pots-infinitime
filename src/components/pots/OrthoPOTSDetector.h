@@ -50,7 +50,10 @@ namespace Pinetime {
       bool inOrthoWindow = false;
       uint32_t orthoWindowStartSec = 0;
 
-      // Baseline HR: rolling average of last 10 readings while supine
+      // Baseline HR: rolling average of last N readings while supine
+      static constexpr uint8_t hrBaselineWindow = 10;
+      uint8_t hrBaselineSamples[hrBaselineWindow] = {};
+      uint8_t hrBaselineIndex = 0;
       uint16_t hrBaselineSum = 0;
       uint8_t hrBaselineCount = 0;
       uint8_t hrBaseline = 0;

@@ -17,16 +17,19 @@ OrthoPOTSDetector::Posture OrthoPOTSDetector::ClassifyPosture(int16_t z, int16_t
 
 void OrthoPOTSDetector::RecordBaseline(uint8_t hr) {
   if (hr < 30 || hr > 220) return; // reject invalid HR
-  if (hrBaselineCount < 10) {
+  if (hrBaselineCount < hrBaselineWindow) {
+    hrBaselineSamples[hrBaselineIndex] = hr;
+    hrBaselineIndex = (hrBaselineIndex + 1) % hrBaselineWindow;
     hrBaselineSum += hr;
     hrBaselineCount++;
-    if (hrBaselineCount > 0) {
-      hrBaseline = static_cast<uint8_t>(hrBaselineSum / hrBaselineCount);
-    }
+    hrBaseline = static_cast<uint8_t>(hrBaselineSum / hrBaselineCount);
   } else {
-    // Rolling: drop oldest (approximate — we don't track individual values)
-    hrBaselineSum = hrBaselineSum - hrBaseline + hr;
-    hrBaseline = static_cast<uint8_t>(hrBaselineSum / 10);
+    // Rolling window: drop the actual oldest sample, not the running average
+    uint8_t oldest = hrBaselineSamples[hrBaselineIndex];
+    hrBaselineSamples[hrBaselineIndex] = hr;
+    hrBaselineIndex = (hrBaselineIndex + 1) % hrBaselineWindow;
+    hrBaselineSum = hrBaselineSum - oldest + hr;
+    hrBaseline = static_cast<uint8_t>(hrBaselineSum / hrBaselineWindow);
   }
 }
 
@@ -77,6 +80,7 @@ void OrthoPOTSDetector::Update(int16_t z, int16_t y, uint8_t current_hr, uint32_
       supineDwellSecs = 1;
       hrBaselineCount = 0;
       hrBaselineSum = 0;
+      hrBaselineIndex = 0;
       RecordBaseline(current_hr);
     }
   } else if (newPosture == Posture::Upright) {

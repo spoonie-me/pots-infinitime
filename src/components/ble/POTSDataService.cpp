@@ -58,6 +58,10 @@ int POTSDataService::OnAccessRequest(uint16_t attributeHandle, ble_gatt_access_c
     int res = os_mbuf_append(context->om, dailyBuf + 2, 6);
     return (res == 0) ? 0 : BLE_ATT_ERR_INSUFFICIENT_RES;
   }
+  if (attributeHandle == orthoHandle) {
+    int res = os_mbuf_append(context->om, orthoBuf, sizeof(orthoBuf));
+    return (res == 0) ? 0 : BLE_ATT_ERR_INSUFFICIENT_RES;
+  }
   return 0;
 }
 
@@ -69,7 +73,7 @@ void POTSDataService::NotifyHrv(uint8_t rmssd, uint8_t zone) {
   if (!hrvNotifyEnabled) return;
 
   uint16_t connHandle = nimble.connHandle();
-  if (connHandle == 0 || connHandle == BLE_HS_CONN_HANDLE_NONE) return;
+  if (connHandle == BLE_HS_CONN_HANDLE_NONE) return;
 
   uint8_t buf[2] = {rmssd, zone};
   auto* om = ble_hs_mbuf_from_flat(buf, sizeof(buf));
@@ -80,23 +84,22 @@ void POTSDataService::NotifyOrthoEvent(uint32_t timestamp, uint8_t hrBaseline, u
   // Always log to nRF log for debugging
   NRF_LOG_INFO("POTS ortho: base=%d peak=%d delta=%d flagged=%d", hrBaseline, hrPeak, delta, flagged ? 1 : 0);
 
+  // Packet: [timestamp(4LE), baseline, peak, delta(signed), flagged]
+  orthoBuf[0] = static_cast<uint8_t>(timestamp & 0xFF);
+  orthoBuf[1] = static_cast<uint8_t>((timestamp >> 8) & 0xFF);
+  orthoBuf[2] = static_cast<uint8_t>((timestamp >> 16) & 0xFF);
+  orthoBuf[3] = static_cast<uint8_t>((timestamp >> 24) & 0xFF);
+  orthoBuf[4] = hrBaseline;
+  orthoBuf[5] = hrPeak;
+  orthoBuf[6] = static_cast<uint8_t>(delta);
+  orthoBuf[7] = flagged ? 1 : 0;
+
   if (!orthoNotifyEnabled) return;
 
   uint16_t connHandle = nimble.connHandle();
-  if (connHandle == 0 || connHandle == BLE_HS_CONN_HANDLE_NONE) return;
+  if (connHandle == BLE_HS_CONN_HANDLE_NONE) return;
 
-  // Packet: [timestamp(4LE), baseline, peak, delta(signed), flagged]
-  uint8_t buf[8];
-  buf[0] = static_cast<uint8_t>(timestamp & 0xFF);
-  buf[1] = static_cast<uint8_t>((timestamp >> 8) & 0xFF);
-  buf[2] = static_cast<uint8_t>((timestamp >> 16) & 0xFF);
-  buf[3] = static_cast<uint8_t>((timestamp >> 24) & 0xFF);
-  buf[4] = hrBaseline;
-  buf[5] = hrPeak;
-  buf[6] = static_cast<uint8_t>(delta);
-  buf[7] = flagged ? 1 : 0;
-
-  auto* om = ble_hs_mbuf_from_flat(buf, sizeof(buf));
+  auto* om = ble_hs_mbuf_from_flat(orthoBuf, sizeof(orthoBuf));
   ble_gattc_notify_custom(connHandle, orthoHandle, om);
 }
 
