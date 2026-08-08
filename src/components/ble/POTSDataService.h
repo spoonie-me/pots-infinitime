@@ -79,6 +79,9 @@ namespace Pinetime {
 
       // Cached data for READ access: [rmssd, zone, activeMins(2LE), sedMins(2LE), uprightMins(2LE)]
       uint8_t dailyBuf[8] = {};
+
+      // Cached last ortho event for READ access: [timestamp(4LE), baseline, peak, delta(signed), flagged]
+      uint8_t orthoBuf[8] = {};
     };
   }
 }
